@@ -5,6 +5,10 @@ VisualStudioVersion = 15.0.27004.2009
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArkBot 3", "ArkBot 3\ArkBot 3.csproj", "{5D39A12F-5F95-4B39-B2A2-6AA9E2B3EF8F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArkIOInterface", "ArkIOInterface\ArkIOInterface.csproj", "{C429323F-FEC1-496B-AA7C-5F4B7255FCAC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArkIOInterfaceData", "ArkIOInterfaceData\ArkIOInterfaceData.csproj", "{5F66AD7E-6DCC-43E0-B8E4-18042B7A337A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{5D39A12F-5F95-4B39-B2A2-6AA9E2B3EF8F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5D39A12F-5F95-4B39-B2A2-6AA9E2B3EF8F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5D39A12F-5F95-4B39-B2A2-6AA9E2B3EF8F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C429323F-FEC1-496B-AA7C-5F4B7255FCAC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C429323F-FEC1-496B-AA7C-5F4B7255FCAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C429323F-FEC1-496B-AA7C-5F4B7255FCAC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C429323F-FEC1-496B-AA7C-5F4B7255FCAC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F66AD7E-6DCC-43E0-B8E4-18042B7A337A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F66AD7E-6DCC-43E0-B8E4-18042B7A337A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F66AD7E-6DCC-43E0-B8E4-18042B7A337A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F66AD7E-6DCC-43E0-B8E4-18042B7A337A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

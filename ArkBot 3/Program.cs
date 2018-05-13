@@ -151,10 +151,6 @@ namespace ArkBot_3
             {
                 await user.ShowPersonalHelp(e,selectedServer);
             }
-            if (e.Message.Content.ToLower().StartsWith(PrefixString + "backup"))
-            {
-                await Addon_ArkBackup.BackupArk(e, @"C:\Program Files (x86)\Steam\steamapps\common\ARK\ShooterGame\Saved\SavedArks");
-            }
             if (e.Message.Content.ToLower().StartsWith(PrefixString + "role"))
             {
                 await e.Message.RespondAsync("You're in role **" + user.permissionLevel.ToString() + "**.");
@@ -198,9 +194,18 @@ namespace ArkBot_3
                 }
                 
             }
-            if (e.Message.Content.ToLower().StartsWith(PrefixString + "list"))
+            if (e.Message.Content.ToLower().StartsWith(PrefixString + "list") && !e.Message.Content.ToLower().StartsWith(PrefixString + "listbackup"))
             {
                 await selectedServer.ListPlayersCmd(e);
+            }
+            if (e.Message.Content.ToLower().StartsWith(PrefixString + "backup"))
+            {
+                await selectedServer.arkIO.BackupServerDiscord(e, @"C:\Program Files (x86)\Steam\steamapps\common\ARK\ShooterGame\Saved\SavedArks\", @"D:\ArkBackups\");
+            }
+
+            if (e.Message.Content.ToLower().StartsWith(PrefixString + "listbackup"))
+            {
+                await selectedServer.arkIO.ListBackupsDiscord(e,  @"D:\ArkBackups\");
             }
 
             //Save and close user

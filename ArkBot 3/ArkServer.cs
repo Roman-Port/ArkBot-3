@@ -54,6 +54,14 @@ namespace ArkBot_3
         public ulong adminRoleId;
         [DataMember]
         public ulong userRoleId;
+        [DataMember]
+        public string arkServerPath;
+        [DataMember]
+        public string arkServerArgs;
+        [DataMember]
+        public string arkSavePath;
+        [DataMember]
+        public string backupLocation;
 
         //While active stuff
         public ArkRconConnection rcon;
@@ -63,20 +71,11 @@ namespace ArkBot_3
         public ArkServerProcessStatus processStatus = ArkServerProcessStatus.Unknown;
         public Process process = null;
         public DateTime processStartTime = DateTime.UtcNow;
+        public ArkIOInterface arkIO;
 
         //Functions
         //Util
-        public bool StartServer()
-        {
-            string serverExecLocation = "";
-            string serverStartArgs = "";
-            process = Process.Start(serverExecLocation, serverStartArgs);
-            processStartTime = DateTime.UtcNow;
-            processStatus = ArkServerProcessStatus.Online;
-            if (isRconEnabled)
-                processStatus = ArkServerProcessStatus.Starting; //Rcon is enabled, so we can know when the server is running.
-            return true;
-        }
+        
 
         public async Task Cmd_StartServer(DSharpPlus.EventArgs.MessageCreateEventArgs e)
         {
@@ -87,7 +86,7 @@ namespace ArkBot_3
 
 
                 //Begin startup
-                StartServer();
+                //StartServer();
                 //Keep attempting to connect.
                 DateTime start = DateTime.UtcNow;
                 if (isRconEnabled)
@@ -491,6 +490,9 @@ namespace ArkBot_3
             timer = new System.Timers.Timer(Program.arkUpdateTimeMs);
             timer.Elapsed += async (sender, e) => await Update();
             timer.Start();
+            //Connect to Ark IO
+            arkIO = new ArkIOInterface("10.0.1.13", 13000, "password");
+            Console.WriteLine(arkIO.client.client.Connected);
             
         }
 

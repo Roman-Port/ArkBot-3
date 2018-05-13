@@ -205,5 +205,12 @@ namespace ArkBot_3
             embedTwo.Color = DSharpPlus.Entities.DiscordColor.Red;
             return new DiscordEmbedBuilder[] {embed,embedTwo };
         }
+
+        public static string CompareAndUsePlural(string objectName, int count)
+        {
+            if (count == 1)
+                return count.ToString() + " " + objectName;
+            return count.ToString() + " " + objectName + "s";
+        }
     }
 }
