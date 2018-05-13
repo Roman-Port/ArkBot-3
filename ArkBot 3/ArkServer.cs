@@ -502,6 +502,8 @@ namespace ArkBot_3
         //Setup functions
         public static async Task MessageSentToBeginSetup(DSharpPlus.EventArgs.MessageCreateEventArgs e, DiscordUser user)
         {
+               //THIS FUNCTION IS NO LONGER USED! It was replaced by the web interface.
+            
             //If we land here, don't assume the user is auth. Check that now.
             if (user.permissionLevel != DiscordUserPermissionLevel.owner)
             {
@@ -660,6 +662,10 @@ namespace ArkBot_3
 
         public async Task MessageSentDuringSetup(DSharpPlus.EventArgs.MessageCreateEventArgs e)
         {
+            //THIS FUNCTION IS NO LONGER USED! It was replaced by the web interface.
+            
+            
+            
             //If we land here, WE ASSUME THE USER IS AUTH AND THIS WAS SENT VIA DM
 
             //Decode the JSON sent.
