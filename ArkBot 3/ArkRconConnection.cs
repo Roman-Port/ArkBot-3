@@ -5,90 +5,68 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Net;
 using System.Threading;
-using RomansRconClient;
+using RomansRconClient2;
 
 namespace ArkBot_3
 {
-    class ArkRconConnection
+    
+    class LegacyArkRconConnection
     {
         //Works with RCON stuff
+        /*
         public static async Task<ArkRconConnection> ConnectToRcon(string ip, ushort port, string arkPassword)
         {
-            var rcon = RconConnection.ConnectToRcon(ip, port, arkPassword);
-            var c = new ArkRconConnection(rcon, ip, port, arkPassword); ;
-            c.isConnected = rcon.status == RconConnectionStatus.Connected;
+            ArkRconConnection c = null;
+            bool ready = false;
+            var rcon = new RconClient(new System.Net.IPEndPoint(System.Net.IPAddress.Parse(ip), port), arkPassword, new RconClient.ReadyCallback((RconClient context, bool okay) =>
+            {
+                ready = true;
+                
+            }));
+            c = new ArkRconConnection(rcon, ip, port, arkPassword);
+            while (ready == false) ;
+            c.isReady = ready;
+            Console.WriteLine("Sock ready");
             return c;
         }
 
+        public static async Task<ArkRconConnection> ConnectToRcon(string ip, int port, string arkPassword)
+        {
+            return await ConnectToRcon(ip, ushort.Parse(port.ToString()), arkPassword);
+        }
+
         //Class stuff
-        RconConnection rconClient;
-        public bool isConnected;
+        RconClient rconClient;
+        public bool isReady = false;
         public string failMsg;
         public string ip;
         public ushort port;
         public string arkPassword;
 
-        public ArkRconConnection(RconConnection client, string _ip, ushort _port, string _arkPassword)
+        public ArkRconConnection(RconClient client, string _ip, ushort _port, string _arkPassword)
         {
             //Main constructor.
             rconClient = client;
-            isConnected = true;
             ip = _ip;
             port = _port;
             arkPassword = _arkPassword;
         }
-        public ArkRconConnection(string msg)
-        {
-            //Failed constructor.
-            failMsg = msg;
-            isConnected = false;
-        }
 
-        public async Task<string> RunCommand(string msg)
+        public string RunCommand(string msg)
         {
-            var response = rconClient.SendCommand(msg);
-            if(response.status != RconResponseStatus.Ok)
-            {
-                //Try to reconnect.
-                Console.WriteLine("Connection send error.");
-                await ForceFullReconnect();
-                response = rconClient.SendCommand(msg);
-                if (response.status != RconResponseStatus.Ok)
-                {
-                    throw new Exception("Failed to run RCON command; The status was not Ok. Use RunRCON function instead to avoid this error.");
-                } else
-                {
-                    //Fixed
-                    Console.WriteLine("Reconnected from error.");
-                    return response.body;
-                }
-                    
-            }
-            return response.body;
-        }
+            //Wait to be ready
+            Console.WriteLine("what");
+            string response = rconClient.GetResponse(msg);
+            Console.WriteLine(response);
+            return response;
+        }*/
 
-        public async Task ForceFullReconnect()
-        {
-            var obj = await ConnectToRcon(ip, port, arkPassword);
-            rconClient = obj.rconClient;
-        }
-
-        public async Task<RomansRconClient.RconResponse> RunRCON(string msg)
-        {
-            //A more advanced version of RunCommand
-            return rconClient.SendCommand(msg);
-        }
-
-        public void Dispose()
-        {
-        }
-
-        public async Task DiscordRawRconCommand(DSharpPlus.EventArgs.MessageCreateEventArgs e, DiscordUser user)
+        public static async Task DiscordRawRconCommand(DSharpPlus.EventArgs.MessageCreateEventArgs e, DiscordUser user, ArkServer server)
         {
             if(user.permissionLevel == DiscordUserPermissionLevel.owner)
             {
                 //Ok to run.
-                await e.Message.RespondAsync(await RunCommand(e.Message.Content.Substring((Program.PrefixString + "rcon").Length)));
+                await e.Message.RespondAsync(server.rconConnection.GetResponse(e.Message.Content.Substring((Program.PrefixString + "rcon ").Length)));
             } else
             {
                 //Cannot run becasue of permission level.

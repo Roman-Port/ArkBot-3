@@ -15,6 +15,27 @@ namespace ArkBot_3
         public string messageContent;
         public string messageSteamName;
         public string messageIngameName;
+
+        public DateTime ParseTime()
+        {
+            //Parse the ark time in format 2018.06.10_15.16.37
+            string[] splitByPeriod = time.Split('.');
+            string[] splitByUnderscore = time.Split('_')[1].Split('.');
+            int year = int.Parse(splitByPeriod[0]);
+            int month = int.Parse(splitByPeriod[1]);
+            int day = int.Parse(splitByPeriod[2].Substring(0,splitByPeriod[2].IndexOf('_')));
+            //Parse specific time
+            int hour = int.Parse(splitByUnderscore[0]);
+            int min = int.Parse(splitByUnderscore[1]);
+            int sec = int.Parse(splitByUnderscore[2]);
+            return new DateTime(year, month, day, hour, min, sec, DateTimeKind.Utc);
+        }
+
+        public string ParseTimeString()
+        {
+            DateTime t = ParseTime();
+            return t.ToLongDateString() + " at " + t.ToShortTimeString()+" UTC";
+        }
     }
 
     enum ArkLogMsgType
@@ -57,6 +78,9 @@ namespace ArkBot_3
                     case ArkLogMsgType.Chat:
                         DealWith_Death_Chat(msg, content);
                         break;
+                    case ArkLogMsgType.DisconnectJoin:
+                        DealWith_DisconnectJoin(msg, content);
+                        break;
                 }
                 return msg;
             } catch
@@ -75,6 +99,8 @@ namespace ArkBot_3
             bool wasKilledBy = content.Contains(" was killed by ");
             if (wasKilledBy)
                 return ArkLogMsgType.Death_KilledBy;
+            if (content.Contains(" left this ARK!") || content.Contains(" joined this ARK!"))
+                return ArkLogMsgType.DisconnectJoin;
             if(content.Contains(" was killed!"))
             {
                 return ArkLogMsgType.Death_Generic;
@@ -104,6 +130,18 @@ namespace ArkBot_3
             msg.messageSteamName = content.Split('(')[0];
             msg.messageIngameName = content.Split('(')[1].Substring(content.Split('(')[1].IndexOf(')'));
             msg.messageContent = content.Substring(content.IndexOf("): "));
+        }
+
+        private static void DealWith_DisconnectJoin(ArkLogMsg msg, string content)
+        {
+            string[] split = content.Split(':');
+            string data = split[split.Length - 1];
+            string person = data.Replace(" joined this ARK!", "").Replace(" left this ARK!", "");
+            bool joined = content.Replace(" joined this ARK!", "").Length != content.Length; //That is jank
+            msg.messageContent = "left"; //If they left or joined
+            if (joined)
+                msg.messageContent = "joined";
+            msg.messageIngameName = person; //Person
         }
 
         private static void DealWith_Death_KilledBy(ArkLogMsg msg, string content)

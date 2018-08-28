@@ -1,10 +1,12 @@
-﻿using System;
+﻿using RomansRconClient2;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
@@ -49,7 +51,7 @@ namespace ArkBot_3
         [DataMember]
         public string serverUuid;
         [DataMember]
-        public int rconPort; //These might not be used.
+        public int rconPort; //I don't think this is ever assigned to. You sdhould fix that.
         [DataMember]
         public ulong adminRoleId;
         [DataMember]
@@ -64,19 +66,17 @@ namespace ArkBot_3
         public string backupLocation;
 
         //While active stuff
-        public ArkRconConnection rcon;
-        public bool isRconConnected = false;
         public System.Timers.Timer timer; //Used for updates
         public string[] userlistCache = new string[0];
         public ArkServerProcessStatus processStatus = ArkServerProcessStatus.Unknown;
         public Process process = null;
         public DateTime processStartTime = DateTime.UtcNow;
         public ArkIOInterface arkIO;
+        public RconClient rconConnection;
 
         //Functions
         //Util
-        
-
+        /*
         public async Task Cmd_StartServer(DSharpPlus.EventArgs.MessageCreateEventArgs e)
         {
             var msg = await e.Message.RespondAsync(embed: Tools.GenerateEmbed("Server Starting...", "", "The server \"" + name + "\" is starting...", DSharpPlus.Entities.DiscordColor.Yellow));
@@ -95,8 +95,9 @@ namespace ArkBot_3
                     while (true)
                     {
                         //Try to connect.
-                        rcon = ArkRconConnection.ConnectToRcon(rconIp, ushort.Parse(rconPort.ToString()), rconPassword).ConfigureAwait(false).GetAwaiter().GetResult();
-                        if (rcon.isConnected)
+                        var rcon = ArkRconConnection.ConnectToRcon(rconIp, ushort.Parse(rconPort.ToString()), rconPassword).ConfigureAwait(false).GetAwaiter().GetResult();
+                        rconConnection = rcon;
+                        if (rcon.isReady)
                         {
                             //Connected
                             var embed = Tools.GenerateEmbed("Server Started!", "", "The server is ready to use and join!", DSharpPlus.Entities.DiscordColor.Green);
@@ -113,6 +114,7 @@ namespace ArkBot_3
                             msg.ModifyAsync(embed: embed).ConfigureAwait(false).GetAwaiter().GetResult();
                             break;
                         }
+                        Thread.Sleep(5000);
                     }
                 }
                 else
@@ -120,25 +122,7 @@ namespace ArkBot_3
 
                 }
             }).Start();
-        }
-
-        private void FetchArkProcess()
-        {
-            Process[] ps = Process.GetProcessesByName("ShooterGameServer");
-            if(ps.Length==1)
-            {
-                process = ps[0];
-                Console.WriteLine("Found Ark process " + process.Id.ToString());
-                processStatus = ArkServerProcessStatus.Online;
-                processStartTime = DateTime.UtcNow;
-            } else
-            {
-                //Not found.
-                process = null;
-                processStatus = ArkServerProcessStatus.Unknown;
-                Console.WriteLine("Ark process couldn't be found.");
-            }
-        }
+        }*/
 
         public async Task<Entity_ArkMessage[]> FetchMessages(string rawBuffer = "na")
         {
@@ -163,11 +147,6 @@ namespace ArkBot_3
             return messageBuffer;
         }
 
-        private bool GetIsRconOkay()
-        {
-            return (processStatus == ArkServerProcessStatus.Online || processStatus == ArkServerProcessStatus.Unknown) && isRconEnabled && isRconConnected;
-        }
-
         private long LastError = 0;
 
         private async Task Update()
@@ -175,36 +154,7 @@ namespace ArkBot_3
             //Called every second
             try
             {
-                if (GetIsRconOkay()) //Only do this if RCON is connected and enabled.
-                {
-                    //Check for Ark leave/reconnects
-                    Entity_ArkPlayer[] onlinePlayers = await GetAndSendPlayerJoinLeaves();
-
-                    //Print log actions
-                    ArkLogMsg[] logs = await UpdateGameLog();
-
-                    //Check for chats
-                    int chatsSent = await GetAndSendNewChat();
-
-                    //Give out points.
-                    float numberOfPoints = Program.arkPointMult * ((float)Program.arkUpdateTimeMs / 1000f);
-                    if (onlinePlayers != null)
-                    {
-                        //Find this user.
-                        foreach (Entity_ArkPlayer player in onlinePlayers)
-                        {
-                            //Get via NAME
-                            DiscordUser user = DiscordUser.GetUserByArkName(player.name.Trim(' '));
-                            if (user != null)
-                            {
-                                //Add points
-                                user.arkPoints += numberOfPoints;
-                                //Save
-                                user.CloseUser();
-                            }
-                        }
-                    }
-                }
+                ArkLogMsg[] logs = await UpdateGameLog();
             } catch (Exception ex)
             {
                 //Check we've errored recently.
@@ -230,7 +180,16 @@ namespace ArkBot_3
 
         public async Task<string> RunRCONCommand(string msg)
         {
-            return await rcon.RunCommand(msg);
+            string output = "";
+            if (rconConnection == null)
+            {
+                throw new Exception("Not connected");
+            }
+            else
+            {
+                output = rconConnection.GetResponse(msg);
+            }
+            return output;
         }
         
         public async Task<int> GetAndSendNewChat()
@@ -274,7 +233,7 @@ namespace ArkBot_3
 
         public async Task SendArkMessage(string msg, string username)
         {
-            await RunRCONCommand("ServerChat ["+username+"] " + msg); //POSSIBLE INJECTION ATTACK!
+            await RunRCONCommand("ServerChat ["+username+"] " + msg); 
         }
 
         public async Task<string[]> FetchPlayerList()
@@ -285,33 +244,33 @@ namespace ArkBot_3
             {
                 return new string[0];
             }
-            string[] rawArray = Tools.SplitRconByLine(raw);
-            List<string> p = new List<string>();
-            foreach(string r in rawArray)
+            string[] list = raw.Split('\n');
+            List<string> output = new List<string>();
+            foreach(string n in list)
             {
-                if (r.Length < 3)
-                    continue;
-                p.Add(r.Substring(r.Split('.').Length));
+                Regex r = new Regex(@"([A-z])\w+");
+                var split = r.Matches(n);
+                foreach(var s in split)
+                {
+                    string ss = s.ToString();
+                    if (ss.Length > 2)
+                        output.Add(ss);
+                }
             }
-            return p.ToArray();
+            return output.ToArray();
         }
 
         public async Task ListPlayersCmd(DSharpPlus.EventArgs.MessageCreateEventArgs e)
         {
-            //Fetch players.
-            string players = "";
-            int amount = 0;
-            foreach(string p in userlistCache)
+            //Run the RCON command.
+            string[] playerList = await FetchPlayerList();
+            string outputList = "";
+            foreach(string player in playerList)
             {
-                if (p.Length < 2)
-                    continue;
-                //Parse
-                Entity_ArkPlayer player = Entity_ArkPlayer.ParsePlayerList(p, Entity_ArkPlayerStatus.Joined);
-                players += player.name + "\r\n";
-                amount++;
+                outputList += player + "\r\n";
             }
             //Generate
-            var embed = Tools.GenerateEmbed("Player Listing", amount.ToString() + " players total", players, DSharpPlus.Entities.DiscordColor.Magenta);
+            var embed = Tools.GenerateEmbed("Player Listing", playerList.Length.ToString() + " players total", outputList, DSharpPlus.Entities.DiscordColor.Magenta);
             //Respond
             await e.Message.RespondAsync(embed: embed);
         }
@@ -403,7 +362,7 @@ namespace ArkBot_3
             if (LogLinesCache == null)
                 LogLinesCache = new string[0];
 
-            string raw = await rcon.RunCommand("GetGameLog");
+            string raw = await RunRCONCommand("GetGameLog");
             if (raw.Contains("Server received, But no response!!"))
                 return new string[0];
             //Split
@@ -431,8 +390,12 @@ namespace ArkBot_3
                 //Check if we got anything
                 if (logItems.Count == 0)
                     return new ArkLogMsg[0];
-                //Get Discord server.
-                var channel = await Program.discord.GetChannelAsync(notificationChannel);
+                DSharpPlus.Entities.DiscordChannel channel = null;
+                if (logItems.Count>0)
+                {
+                    //Get Discord server.
+                    channel = await Program.discord.GetChannelAsync(notificationChannel);
+                }
                 //Foreach
                 foreach (ArkLogMsg msg in logItems)
                 {
@@ -451,8 +414,21 @@ namespace ArkBot_3
                             await channel.SendMessageAsync(embed: embedTwo);
                             break;
                         case ArkLogMsgType.NewTame:
-                            var embedThree = Tools.GenerateEmbed(msg.actioner.tribe + " tamed a " + msg.target.name + "!", "Neato :ok_hand:", "Level " + msg.target.level.ToString() + "!", DSharpPlus.Entities.DiscordColor.Yellow);
+                            var embedThree = Tools.GenerateEmbed(msg.actioner.tribe + " tamed a " + msg.target.name + "!", "Nice tame!", "Level " + msg.target.level.ToString() + "!", DSharpPlus.Entities.DiscordColor.Yellow);
                             await channel.SendMessageAsync(embed: embedThree);
+                            break;
+                        case ArkLogMsgType.Chat:
+                            //This is a bit of a jank-fix that might break in the future.
+                            string msgContent = msg.messageContent.Substring(3);
+                            var embedFour = Tools.GenerateEmbed("Message from " + msg.messageSteamName, msg.ParseTimeString()+" - "+name, msgContent, DSharpPlus.Entities.DiscordColor.LightGray);
+                            await channel.SendMessageAsync(embed: embedFour);
+                            break;
+                        case ArkLogMsgType.DisconnectJoin:
+                            var color = DSharpPlus.Entities.DiscordColor.Red;
+                            if (msg.messageContent == "joined")
+                                color = DSharpPlus.Entities.DiscordColor.Green; //They actually joined.
+                            var embedFive = Tools.GenerateEmbed("Player " + msg.messageIngameName + " " + msg.messageContent + " the game", msg.ParseTimeString(), "Server " + name, color);
+                            await channel.SendMessageAsync(embed: embedFive);
                             break;
                     }
                 }
@@ -468,31 +444,53 @@ namespace ArkBot_3
 
 
 
-
+        /// <summary>
+        /// Stop server
+        /// </summary>
         public void DeInit()
         {
-            //Stop
-            if(rcon!=null)
-                rcon.Dispose();
+            
         }
 
+
+        /// <summary>
+        /// Reinitialization
+        /// </summary>
+        /// <returns></returns>
         public async Task Reinit()
         {
-            //Find Ark process
-            FetchArkProcess();
+            Console.WriteLine("Initializing ARK server " + name);
             //Set this up again.
-            if (isRconEnabled)
+            Console.WriteLine("Connecting via RCON...");
+            rconConnection = new RconClient(new System.Net.IPEndPoint(System.Net.IPAddress.Parse(rconIp), ushort.Parse(rconPort.ToString())), rconPassword, new RconClient.ReadyCallback((RconClient context, bool okay) =>
             {
-                rcon = await ArkRconConnection.ConnectToRcon(rconIp, 27020, rconPassword);
-                isRconConnected = true;
-            }
-            //Set up the timer again
-            timer = new System.Timers.Timer(Program.arkUpdateTimeMs);
-            timer.Elapsed += async (sender, e) => await Update();
-            timer.Start();
-            //Connect to Ark IO
-            arkIO = new ArkIOInterface("10.0.1.13", 13000, "password");
-            Console.WriteLine(arkIO.client.client.Connected);
+                Console.WriteLine("Connected to RCON.");
+                bool isRconConnected = okay;
+                if (!isRconConnected)
+                {
+                    Console.WriteLine("Failed to connect to the Ark server via RCON. Check to make sure it's running, or see if your settings are correct.");
+                }
+                
+                //Set up the timer again
+                timer = new System.Timers.Timer(Program.arkUpdateTimeMs);
+                timer.Elapsed += async (sender, e) => await Update();
+                timer.Start();
+                //Connect to Ark IO
+                try
+                {
+                    arkIO = new ArkIOInterface("10.0.1.13", 13000, "password"); //Todo: Set this up in a custom  way.
+                    if (!arkIO.client.client.Connected)
+                    {
+                        Console.WriteLine("Failed to connect to the Ark IO interface. Check the settings and try again.");
+                    }
+                }
+                catch
+                {
+                    arkIO = null;
+                    Console.WriteLine("Failed to connect to the Ark IO interface. Check the settings and try again.");
+                }
+            }));
+            
             
         }
 
@@ -500,30 +498,14 @@ namespace ArkBot_3
 
 
         //Setup functions
-        public static async Task MessageSentToBeginSetup(DSharpPlus.EventArgs.MessageCreateEventArgs e, DiscordUser user)
-        {
-               //THIS FUNCTION IS NO LONGER USED! It was replaced by the web interface.
-            
-            //If we land here, don't assume the user is auth. Check that now.
-            if (user.permissionLevel != DiscordUserPermissionLevel.owner)
-            {
-                //User isn't owner. Stop.
-                await e.Message.RespondAsync("You're not the owner of ArkBot, you cannot continue with setup.");
-                return;
-            }
-            //Check if the user already has a server creation in progress.
-            if (GetArkServersInSetupStageForUser(user.id).Length != 0)
-            {
-                await e.Message.RespondAsync("You're already in the process of creating an Ark server. Finish it first! Todo: Add a way to stop creation.");
-                return;
-            }
-            //This function will create an ArkServer class and get it ready for setup.
-            //Ask the user the first question over DM.
-            var channel = await Program.discord.CreateDmAsync(e.Author);
-            var embed = Tools.GenerateEmbed("ArkBot Setup", "", "To setup ArkBot, go to the URL below and reply with the encoded data.", Program.CreateDynamicColor());
-            await channel.SendMessageAsync(embed:embed);
-            
-        }
+        
+        /// <summary>
+        /// This function will be called when the encoded string is sent to the bot's DM to setup the server.
+        /// </summary>
+        /// <param name="e"></param>
+        /// <param name="user"></param>
+        /// <returns></returns>
+        /// 
 
         public static async Task MessageSentToFinshSetup(DSharpPlus.EventArgs.MessageCreateEventArgs e, DiscordUser user)
         {
@@ -556,8 +538,9 @@ namespace ArkBot_3
                 var testMsg = await e.Message.RespondAsync(embed: embed);
                 try
                 {
-                    var rcon = await ArkRconConnection.ConnectToRcon(s.rconIp, 27020, s.rconPassword);
-                    bool isConnected = rcon.isConnected;
+                    /*
+                    var rcon = await ArkRconConnection.ConnectToRcon(s.rconIp, s.rconPort, s.rconPassword);
+                    bool isConnected = rcon.isReady;
                     if (isConnected)
                     {
                         embed = Tools.GenerateEmbed("RCON test passed!", "", "Thanks for setting up RCON!", DSharpPlus.Entities.DiscordColor.Green);
@@ -568,7 +551,8 @@ namespace ArkBot_3
                         embed = Tools.GenerateEmbed("RCON test failed!", "Please try again.", "No other info provided.", DSharpPlus.Entities.DiscordColor.Red);
                         await testMsg.ModifyAsync(embed: embed);
                         return;
-                    }
+                    }*/
+                    throw new NotImplementedException();
                 } catch (Exception ex)
                 {
                     embed = Tools.GenerateEmbed("RCON test failed!", "Please try again.", ex.Message, DSharpPlus.Entities.DiscordColor.Red);
@@ -641,204 +625,6 @@ namespace ArkBot_3
             await msg.ModifyAsync(embed: embed);
         }
 
-        public static ArkServer[] GetArkServersInSetupStageForUser(ulong id)
-        {
-            //Fetch Ark servers that are in the process of being created for a specific user.
-            List<ArkServer> output = new List<ArkServer>();
-            foreach (ArkServer s in Program.setupInProgressServers)
-            {
-                if (s.creatorId == id && s.creationProgress!= ArkServerCreationStep.Done)
-                {
-                    output.Add(s);
-                }
-            }
-            return output.ToArray();
-        }
-
-        static string SetupPrintStep(ArkServerCreationStep step)
-        {
-            return "Step " + ((int)step).ToString() + "/7";
-        }
-
-        public async Task MessageSentDuringSetup(DSharpPlus.EventArgs.MessageCreateEventArgs e)
-        {
-            //THIS FUNCTION IS NO LONGER USED! It was replaced by the web interface.
-            
-            
-            
-            //If we land here, WE ASSUME THE USER IS AUTH AND THIS WAS SENT VIA DM
-
-            //Decode the JSON sent.
-
-
-
-
-
-            //Check what they'd like to do.
-            if (creationProgress == ArkServerCreationStep.NamePrompt)
-            {
-                //They typed in a name. Set it.
-                name = e.Message.Content;
-                await e.Message.RespondAsync("Cool. The server name is now '" + name + "'.\r\nWould you like to enable RCON for the server? This will add extended features such as chat and server list. [Yes/No]");
-                creationProgress = ArkServerCreationStep.RconPrompt;
-                return;
-            }
-            if (creationProgress == ArkServerCreationStep.RconPrompt)
-            {
-                //Replied to the prompt to enable RCON. See if it's parseable
-                bool parseOk = Tools.TryParseYesNo(e.Message.Content, out bool response);
-                if (!parseOk)
-                {
-                    //Bad parse. Let the user know and hault.
-                    await e.Message.RespondAsync("Couldn't parse yes/no! Try again.");
-                    return;
-                }
-                //Parse was OK. Set it and respond appropriately.
-                isRconEnabled = response;
-                if (!isRconEnabled)
-                {
-                    //RCON isn't enabled. Set some values.
-                    rconChatPermissionLevel = DiscordUserPermissionLevel.none;
-                    rconPassword = "";
-                    rconIp = "";
-                    //Skip the RCON steps.
-                    await AfterRconSetup(e);
-                }
-                else
-                {
-                    //We'll continue asking the user questions about RCON.
-                    creationProgress = ArkServerCreationStep.Rcon_ChatPermissionLevel;
-                    await e.Message.RespondAsync("What permission level would you like to require for server chat?\r\nOptions: " + Tools.GetPermLevelsString());
-                }
-                return;
-            }
-            if (creationProgress == ArkServerCreationStep.Rcon_ChatPermissionLevel)
-            {
-                //Got response for question about permission level.
-                //Try parse
-                bool ok = Tools.TryParsePermLevel(e.Message.Content, out DiscordUserPermissionLevel perm);
-                if (!ok)
-                {
-                    //Failed to parse. Try again.
-                    await e.Message.RespondAsync("Couldn't parse! " + Tools.GetPermLevelsString() + " Try again.");
-                    return;
-                }
-                //Parse was OK. Set it.
-                rconChatPermissionLevel = perm;
-                creationProgress = ArkServerCreationStep.Rcon_ServerIP;
-                await e.Message.RespondAsync("What is the IP of the server? If you don't know, use 'localhost'.");
-                return;
-            }
-            if (creationProgress == ArkServerCreationStep.Rcon_ServerIP)
-            {
-                //Set it.
-                rconIp = e.Message.Content;
-                creationProgress = ArkServerCreationStep.Rcon_ServerPassword;
-                await e.Message.RespondAsync("What is the admin password for your server? This will only be sent to your server and is used to log into RCON.");
-                return;
-            }
-            if (creationProgress == ArkServerCreationStep.Rcon_ServerPassword)
-            {
-                //Last RCON step.
-                rconPassword = e.Message.Content;
-                //Testing connection
-                var msg = await e.Message.RespondAsync("Testing the connection to " + name + "...");
-                rcon = await ArkRconConnection.ConnectToRcon(rconIp, 27020, rconPassword);
-                if (rcon.isConnected == false)
-                {
-                    //Failed. Restart RCON setup.
-                    await msg.ModifyAsync("RCON connection test failed. Restarting RCON setup...\n```"+rcon.failMsg+"```");
-                    await e.Message.RespondAsync("Would you like to enable RCON for the server? This will add extended features such as chat and server list. [Yes / No]");
-                    creationProgress = ArkServerCreationStep.RconPrompt;
-                }
-                else
-                {
-                    //OK. Allow the user to continue.
-                    await msg.ModifyAsync("RCON connection test was OK!");
-                    //Use the after rcon setup function.
-                    await AfterRconSetup(e);
-                }
-                return;
-            }
-            if(creationProgress== ArkServerCreationStep.ServerStartStopPermissionLevel)
-            {
-                //Parse permission
-                bool ok = Tools.TryParsePermLevel(e.Message.Content, out DiscordUserPermissionLevel perm);
-                if (!ok)
-                {
-                    //Failed to parse. Try again.
-                    await e.Message.RespondAsync("Couldn't parse! " + Tools.GetPermLevelsString() + " Try again.");
-                    return;
-                }
-                //Parse was OK. Set it.
-                serverStartStopPermissionLevel = perm;
-                //Ask for the Discord channel
-                await e.Message.RespondAsync("Please copy the ID of the Discord channel you'd like to use with this Ark server.\r\nTo get this, enable developer tools in the Discord settings, then right click the channel you'd like and hit \"Copy ID\".");
-                creationProgress = ArkServerCreationStep.DiscordChannelPrompt;
-                return;
-            }
-            if (creationProgress == ArkServerCreationStep.DiscordChannelPrompt)
-            {
-                //Try to parse this.
-                var msgStatus = await e.Message.RespondAsync("Testing channel...");
-                try
-                {
-                    ulong id = ulong.Parse(e.Message.Content);
-                    var channel = await Program.discord.GetChannelAsync(id);
-
-                    var msg = await Program.discord.SendMessageAsync(channel, "Setting ArkBot channel to this for server '" + name + "'.");
-                    //We're good if we land here. The message was sent correctly.
-                    notificationChannel = id;
-                    await msgStatus.ModifyAsync("The channel was saved correctly.");
-                    //Now, set some guild settings.
-                    msgStatus = await e.Message.RespondAsync("Creating roles...");
-                    try
-                    {
-                        
-                        var guild = channel.Guild;
-                        //Look for the roles.
-                        var existingRoles = guild.Roles;
-                        ulong roleId_admin = 0;
-                        ulong roleId_user = 0;
-                        foreach(var role in existingRoles)
-                        {
-                            if (role.Name == DiscordUser.ROLE_NAME_USER)
-                                roleId_user = role.Id;
-                            if (role.Name == DiscordUser.ROLE_NAME_ADMIN)
-                                roleId_admin = role.Id;
-                        }
-                        //Create the roles if they don't exist
-                        if (roleId_admin == 0)
-                            roleId_admin = (await guild.CreateRoleAsync(DiscordUser.ROLE_NAME_ADMIN)).Id;
-                        if (roleId_user == 0)
-                            roleId_user = (await guild.CreateRoleAsync(DiscordUser.ROLE_NAME_USER)).Id;
-                        //We know the roles exist.
-                        adminRoleId = roleId_admin;
-                        userRoleId = roleId_user;
-                        await msgStatus.ModifyAsync("Permission roles have been created!\r\nAdd the role **" + DiscordUser.ROLE_NAME_USER + "** to standard users.\r\nAdd the role **" + DiscordUser.ROLE_NAME_ADMIN + "** to admins.\r\nUsers without a role will be **standard users**.\r\nYou will be the only user with **owner**.");
-                    } catch
-                    {
-                        await msgStatus.ModifyAsync("Couldn't modify roles. Make sure ArkBot has permission and try again.");
-                    }
-
-
-                    //Save the server.
-                    msgStatus = await e.Message.RespondAsync("Saving now...");
-                    try
-                    {
-                        await SaveSettings();
-                    } catch
-                    {
-                        //Error.
-                        await msgStatus.ModifyAsync("The server couldn't be saved to the disk. Check to make sure you have a valid save folder.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    await msgStatus.ModifyAsync("Failed to set channel. Check the ID and try again.");
-                }
-            }
-        }
 
         private async Task SaveSettings()
         {
@@ -856,13 +642,6 @@ namespace ArkBot_3
             //Reinit self.
             await Program.LoadArkServer(data);
         }
-
-        public async Task AfterRconSetup(DSharpPlus.EventArgs.MessageCreateEventArgs e)
-        {
-            await e.Message.RespondAsync("What permission level would you like to require for server start/stop?\r\nOptions: " + Tools.GetPermLevelsString());
-            creationProgress = ArkServerCreationStep.ServerStartStopPermissionLevel;
-        }
-
         
     }
 

@@ -29,7 +29,7 @@ namespace ArkIOInterface
             callbacks.Add(new RSN_Server_CallbackConfig(1, new RSN_ServerResponse(OnRequest), typeof(ArkIOInterfaceRequestData)));
 
             //Start server
-            server = RSN_Server.CreateServer(callbacks.ToArray(), "password", 13000);
+            server = RSN_Server.CreateServer(callbacks.ToArray(), "password", 13000, false);
 
             Console.WriteLine("Ark IO Interface ready!");
 

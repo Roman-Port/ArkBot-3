@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace ArkBot_3
 {
+    //This was a test on my own server that is no longer used.
+    
+    /*
     class Addon_ArkTokenStore
     {
         public static async Task MainCmd(string cmd, DSharpPlus.EventArgs.MessageCreateEventArgs e,DiscordUser user)
@@ -61,5 +64,5 @@ namespace ArkBot_3
             price = _price;
             name = _name;
         }
-    }
+    }*/
 }

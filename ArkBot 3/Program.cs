@@ -28,12 +28,18 @@ namespace ArkBot_3
         public static float arkPointMult = 1;
         public static int arkUpdateTimeMs = 3000; //How quickly chat will be updated.
 
+        public static bool shutUp = true;
+        static Dictionary<ulong, DateTime> nou =
+           new Dictionary<ulong, DateTime>();
+
         static void Main(string[] args)
         {
             //Load token
             loginToken = File.ReadAllText(savePath + "discord.token");
             MainAsync(args).ConfigureAwait(false).GetAwaiter().GetResult(); //Begin
         }
+
+
 
         static async Task MainAsync(string[] args)
         {
@@ -59,8 +65,11 @@ namespace ArkBot_3
                 await DiscordUser.AskForOwner();
                 Console.WriteLine("Ready!");
             };
+
             discord.MessageCreated += async e =>
             {
+
+
                 //Fired on message.
                 try {
                     await OnMessage(e);
@@ -136,16 +145,9 @@ namespace ArkBot_3
             if (activeServers.Count>0)
                 selectedServer = activeServers[0];
             DiscordUser user = await DiscordUser.GetUserFromDiscord(e,selectedServer);
-            //Check the command
-            if (e.Message.Content.StartsWith(PrefixString + "create"))
-            {
-                //Create the Ark server
-                await ArkServer.MessageSentToBeginSetup(e, user);
-                return;
-            }
             if(e.Message.Content.ToLower().StartsWith(PrefixString+"rcon "))
             {
-                await selectedServer.rcon.DiscordRawRconCommand(e, user);
+                await LegacyArkRconConnection.DiscordRawRconCommand(e, user, selectedServer);
             }
             if (e.Message.Content.ToLower().StartsWith(PrefixString + "help"))
             {
@@ -163,12 +165,6 @@ namespace ArkBot_3
             {
                 await user.SendUserStatus(e);
             }
-
-            if (e.Message.Content.ToLower().StartsWith(PrefixString + "store"))
-            {
-                string cmd = e.Message.Content.Substring((PrefixString + "store").Length).TrimStart(' ');
-                await Addon_ArkTokenStore.MainCmd(cmd,e, user);
-            }
             if (e.Message.Content.ToLower().StartsWith(PrefixString + "chat"))
             {
                 string msg = e.Message.Content.Substring((PrefixString + "chat ").Length);
@@ -184,6 +180,8 @@ namespace ArkBot_3
                     {
                         //Okay to send
                         await selectedServer.SendArkMessage(msg, e.Author.Username);
+                        var emoji = DSharpPlus.Entities.DiscordEmoji.FromName(discord,":white_check_mark:");
+                        e.Message.CreateReactionAsync(emoji);
                     }
                     
                 } else

@@ -62,8 +62,8 @@
     <Reference Include="RconSharp.Net45, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\RconSharp.Socket.1.0.0\lib\net45\RconSharp.Net45.dll</HintPath>
     </Reference>
-    <Reference Include="RomansRconClient">
-      <HintPath>..\..\..\RomansRconClient\RomansRconClient\bin\Debug\RomansRconClient.dll</HintPath>
+    <Reference Include="RomansRconClient2">
+      <HintPath>..\..\..\RomansRconClient2\RomansRconClient2\bin\Debug\RomansRconClient2.dll</HintPath>
     </Reference>
     <Reference Include="RomansSimpleNetworking">
       <HintPath>..\..\..\RomansSimpleNetworkingExample\RomansSimpleNetworking\bin\Debug\RomansSimpleNetworking.dll</HintPath>
